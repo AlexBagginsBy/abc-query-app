@@ -7,6 +7,6 @@ import java.util.List;
 
 public interface EmployeeCustomRepository {
 
-    List<Employee> findAllByHireDate(LocalDate hiredFrom, LocalDate hiredBefore);
+    List<Employee> findAllByHireDateRange(LocalDate hiredFrom, LocalDate hiredBefore);
 
 }

@@ -26,10 +26,10 @@ public class EmployeeController {
     }
 
     @GetMapping("/employees/hired")
-    List<Employee> getAllByHireDate(@Param("hireDateFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hiredFrom,
-                                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Param("hireDateBefore") LocalDate hiredBefore){
+    List<Employee> getAllByHireDateRange(@Param("hireDateFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hiredFrom,
+                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Param("hireDateBefore") LocalDate hiredBefore){
 
-        return repository.findAllByHireDate(hiredFrom, hiredBefore);
+        return repository.findAllByHireDateRange(hiredFrom, hiredBefore);
     }
 
     @PostMapping("/employees")
