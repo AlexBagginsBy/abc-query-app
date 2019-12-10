@@ -5,6 +5,7 @@ import com.baggins.abcqueryapp.exceptions.IncorrectDateRangeParametersException;
 import com.baggins.abcqueryapp.exceptions.UnrecognizedQueryVersionException;
 import com.baggins.abcqueryapp.repositories.EmployeeCustomRepository;
 import com.baggins.abcqueryapp.repositories.config.FindEmployeesByHireDateRangeConfig;
+import com.baggins.abcqueryapp.utils.ResourceFileReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +20,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class EmployeeRepositoryImpl implements EmployeeCustomRepository {
 
-    private static final int HIRED_FROM_DEFAULT_YEAR = 1995;
-    private static final int HIRED_FROM_DEFAULT_MONTH = 1;
-    private static final int HIRED_FROM_DEFAULT_DAY = 1;
     private static final double V1_0 = 1.0;
     private static final double V1_1 = 1.1;
 
@@ -31,6 +29,9 @@ public class EmployeeRepositoryImpl implements EmployeeCustomRepository {
     @Autowired
     private FindEmployeesByHireDateRangeConfig config;
 
+    @Autowired
+    private ResourceFileReader fileReader;
+
     @Override
     public List<Employee> findAllByHireDateRange(LocalDate hiredFrom, LocalDate hiredBefore) {
         hiredFrom = setHiredFromIfEmpty(hiredFrom);
@@ -38,29 +39,32 @@ public class EmployeeRepositoryImpl implements EmployeeCustomRepository {
 
         validateDateRange(hiredFrom, hiredBefore);
 
+        return getEmployeesByHireDateRange(hiredFrom, hiredBefore);
+
+    }
+
+    private List<Employee> getEmployeesByHireDateRange(LocalDate hiredFrom, LocalDate hiredBefore) {
+        String queryStringFilePath = getQueryFilePath();
+        String queryString = fileReader.getQueryStringFromFile(queryStringFilePath);
+        Query query = entityManager.createNativeQuery(queryString, Employee.class);
+        query.setParameter(1, hiredFrom + "%");
+        query.setParameter(2, hiredBefore + "%");
+
+        return query.getResultList();
+    }
+
+    private String getQueryFilePath() {
+        String queryStringFilePath = null;
+
         if (config.getVersion() == V1_0) {
-            return getEmployeesByHireDateRangeV10(hiredFrom, hiredBefore);
+            queryStringFilePath = "queries/find-employees-by-hire-date-range-v10.sql";
         } else if (config.getVersion() == V1_1) {
-            return getEmployeesByHireDateRangeV11(hiredFrom, hiredBefore);
+            queryStringFilePath = "queries/find-employees-by-hire-date-range-v11.sql";
+        } else {
+            throw new UnrecognizedQueryVersionException("Cannot find 'findAllByHireDateRange' method SQL query with version number: '" + config.getVersion() + "';");
         }
 
-        throw new UnrecognizedQueryVersionException("Cannot find 'findAllByHireDateRange' method SQL query with version number: '" + config.getVersion() + "';");
-    }
-
-    private List<Employee> getEmployeesByHireDateRangeV10(LocalDate hiredFrom, LocalDate hiredBefore) {
-        Query query = entityManager.createNativeQuery("SELECT * FROM employees WHERE hire_date BETWEEN ? AND ?", Employee.class);
-        query.setParameter(1, hiredFrom + "%");
-        query.setParameter(2, hiredBefore + "%");
-
-        return query.getResultList();
-    }
-
-    private List<Employee> getEmployeesByHireDateRangeV11(LocalDate hiredFrom, LocalDate hiredBefore) {
-        Query query = entityManager.createNativeQuery("SELECT * FROM employees WHERE hire_date >= ? AND hire_date <= ?", Employee.class);
-        query.setParameter(1, hiredFrom + "%");
-        query.setParameter(2, hiredBefore + "%");
-
-        return query.getResultList();
+        return queryStringFilePath;
     }
 
     private void validateDateRange(LocalDate hiredFrom, LocalDate hiredBefore) {
@@ -70,7 +74,8 @@ public class EmployeeRepositoryImpl implements EmployeeCustomRepository {
     }
 
     private LocalDate setHiredFromIfEmpty(LocalDate hiredFrom) {
-        return setDateIfEmpty(hiredFrom, LocalDate.of(HIRED_FROM_DEFAULT_YEAR, HIRED_FROM_DEFAULT_MONTH, HIRED_FROM_DEFAULT_DAY));
+        LocalDate defaultHiredFromDate = LocalDate.of(config.getHiredFromDefaultYear(), config.getHiredFromDefaultMonth(), config.getHiredFromDefaultDay());
+        return setDateIfEmpty(hiredFrom, defaultHiredFromDate);
     }
 
     private LocalDate setHiredBeforeIfEmpty(LocalDate hiredBefore) {
